@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+  <meta name="google-site-verification" content="googlea44f14c1ae61c18a.html">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2">
+
+<link rel="stylesheet" href="/css/main.css?v=7.1.1">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon-pohsien/apple-touch-icon-pohsien.png?v=7.1.1">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-pohsien/favicon-32x32-pohsien.png?v=7.1.1">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-pohsien/favicon-16x16-pohsien.png?v=7.1.1">
+
+
+  <link rel="mask-icon" href="/images/favicon-pohsien/favicon.ico?v=7.1.1" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.1.1',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: true,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="這篇主要是測試Enterprise PKS佈出來的Kubernetes Node 上面的硬碟滿了會造成什麼影響以及要如何解決。其實這個問題應該跟一般Kubernetes環境差不多，只是目前有一些case緣故還是需要在Enterprise PKS環境下測試一下。因此特別針對這部分做測試。">
+<meta name="keywords" content="PKS,kubernetes,Enterprise PKS,disk,out of space">
+<meta property="og:type" content="article">
+<meta property="og:title" content="針對Enterprise PKS環境的K8s Cluster Node硬碟空間不足測試及解法">
+<meta property="og:url" content="https://pohsienshih.github.io/2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/index.html">
+<meta property="og:site_name" content="Pohsien Workspace">
+<meta property="og:description" content="這篇主要是測試Enterprise PKS佈出來的Kubernetes Node 上面的硬碟滿了會造成什麼影響以及要如何解決。其實這個問題應該跟一般Kubernetes環境差不多，只是目前有一些case緣故還是需要在Enterprise PKS環境下測試一下。因此特別針對這部分做測試。">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://i.imgur.com/xqutNQH.png">
+<meta property="og:image" content="https://i.imgur.com/EPqrgxu.png">
+<meta property="og:image" content="https://i.imgur.com/4fwqOoO.png">
+<meta property="og:image" content="https://i.imgur.com/W40XIom.png">
+<meta property="og:image" content="https://i.imgur.com/YLrnyK7.png">
+<meta property="og:image" content="https://i.imgur.com/l1PCEZ3.png">
+<meta property="og:image" content="https://i.imgur.com/gZX51JK.png">
+<meta property="og:image" content="https://i.imgur.com/mlKfE1v.png">
+<meta property="og:image" content="https://i.imgur.com/a3vEKZ7.png">
+<meta property="og:image" content="https://i.imgur.com/euMfkss.png">
+<meta property="og:image" content="https://i.imgur.com/CQYZMUg.png">
+<meta property="og:image" content="https://i.imgur.com/75Kg9LL.png">
+<meta property="og:image" content="https://i.imgur.com/rsK2ejX.png">
+<meta property="og:image" content="https://i.imgur.com/LXvruwh.png">
+<meta property="og:image" content="https://i.imgur.com/VSiEQfY.png">
+<meta property="og:image" content="https://i.imgur.com/Tt4VPwq.png">
+<meta property="og:image" content="https://i.imgur.com/Iqi8IWj.png">
+<meta property="og:image" content="https://i.imgur.com/6HJdvMp.png">
+<meta property="og:image" content="https://i.imgur.com/yssRzzr.png">
+<meta property="og:image" content="https://i.imgur.com/hydxUJn.png">
+<meta property="og:image" content="https://i.imgur.com/j19gZsa.png">
+<meta property="og:image" content="https://i.imgur.com/LCP91iw.png">
+<meta property="og:image" content="https://i.imgur.com/RAIviCX.png">
+<meta property="og:image" content="https://i.imgur.com/oUw5Yi2.png">
+<meta property="og:image" content="https://i.imgur.com/dxXNQZy.png">
+<meta property="og:image" content="https://i.imgur.com/rxH2FnH.png">
+<meta property="og:image" content="https://i.imgur.com/jQ66VyK.png">
+<meta property="og:image" content="https://i.imgur.com/UcRfNFr.png">
+<meta property="og:updated_time" content="2019-12-20T03:11:49.313Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="針對Enterprise PKS環境的K8s Cluster Node硬碟空間不足測試及解法">
+<meta name="twitter:description" content="這篇主要是測試Enterprise PKS佈出來的Kubernetes Node 上面的硬碟滿了會造成什麼影響以及要如何解決。其實這個問題應該跟一般Kubernetes環境差不多，只是目前有一些case緣故還是需要在Enterprise PKS環境下測試一下。因此特別針對這部分做測試。">
+<meta name="twitter:image" content="https://i.imgur.com/xqutNQH.png">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="https://pohsienshih.github.io/2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>針對Enterprise PKS環境的K8s Cluster Node硬碟空間不足測試及解法 | Pohsien Workspace</title>
+  
+
+
+
+
+  <script async src="//www.googletagmanager.com/gtag/js?id=UA-150934951-1"></script>
+  <script>
+    var host = window.location.hostname;
+    if (host !== "localhost" || !true) {
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'UA-150934951-1');
+    }
+  </script>
+
+
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Pohsien Workspace</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+      
+        <h1 class="site-subtitle" itemprop="description">Cloud Native, Network, Security, etc.</h1>
+      
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-about">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/about/" rel="section"><i class="menu-item-icon fa fa-fw fa-user"></i> <br>About</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-categories">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/categories/" rel="section"><i class="menu-item-icon fa fa-fw fa-th"></i> <br>Categories</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>Search</a>
+        </li>
+      
+    </ul>
+  
+
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="Searching..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://pohsienshih.github.io/2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Pohsien Shih">
+      <meta itemprop="description" content="System Engineer">
+      <meta itemprop="image" content="/images/pohsien.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Pohsien Workspace">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h2 class="post-title" itemprop="name headline">針對Enterprise PKS環境的K8s Cluster Node硬碟空間不足測試及解法
+
+              
+            
+          </h2>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2019-07-02 21:22:24" itemprop="dateCreated datePublished" datetime="2019-07-02T21:22:24+08:00">2019-07-02</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2019-12-20 11:11:49" itemprop="dateModified" datetime="2019-12-20T11:11:49+08:00">2019-12-20</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/Pivotal-Container-Service/" itemprop="url" rel="index"><span itemprop="name">Pivotal Container Service</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+            
+              
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+            
+                <span class="post-meta-item-text">Comments: </span>
+                <a href="/2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>這篇主要是測試Enterprise PKS佈出來的<code>Kubernetes Node</code> 上面的硬碟滿了會造成什麼影響以及要如何解決。其實這個問題應該跟一般<code>Kubernetes</code>環境差不多，只是目前有一些case緣故還是需要在Enterprise PKS環境下測試一下。因此特別針對這部分做測試。</p>
+<a id="more"></a>
+<h2 id="Kubernetes-Node上的disk種類"><a href="#Kubernetes-Node上的disk種類" class="headerlink" title="Kubernetes Node上的disk種類"></a>Kubernetes Node上的disk種類</h2><p>在<strong>PCF Ops Manager Web GUI &gt; Enterprise PKS Tile &gt; Plan</strong>裡，可以設定Enterprise PKS部署出來的<code>Kubernetes Cluster</code>資源，其中有一些欄位是設定node VM的硬碟資訊:</p>
+<p><img src="https://i.imgur.com/xqutNQH.png" alt></p>
+<p>預設<code>BOSH</code>產生出來的node上面會有三顆虛擬硬碟。這裡我們用<code>sda</code>,<code>sdb</code>,<code>sdc</code>來代稱。</p>
+<ol>
+<li><code>sda</code>: Node System Disk，掛載目錄為<code>/</code>，為node VM作業系統的根目錄，這個大小目前是不能設定的，預設3GB。</li>
+<li><code>sdb</code>: Agent Package Disk，掛載目錄為<code>/var/vcap/data...</code>，為存放<code>pks-system</code>以及<code>bosh agent</code>這些必要套件的位置，這個就是<code>PCF Ops Manager</code>上設定的<code>VM Type</code>裡面的disk大小。</li>
+<li><code>sdc</code>: Persistent Disk，掛載目錄<code>/var/vcap/store/...</code>，這個disk在master中是用來存<code>etcd</code>的，因此只要disk沒有掛掉，不管<code>BOSH</code>怎麼修復master，<code>etcd</code>資料都不會消失。如果是worker的話，這個disk是用來存<code>docker container</code> 以及<code>docker image</code>。<code>sdc</code>大小是根據<code>PCF Ops Manager</code>裡面設定的<code>Persistent Disk Type</code>來配置。</li>
+</ol>
+<div class="note warning">
+            <p>當node發生錯誤而啟動<code>BOSH</code>自動修復機制時，只有<code>sdc</code>資料會被保留，其他的都會被清空還原成初始狀態。</p>
+          </div>
+<div class="note info">
+            <p>上面disk名稱只是方便識別，並非官方取名。</p>
+          </div>
+<p><img src="https://i.imgur.com/EPqrgxu.png" alt></p>
+<p>由於disk裡的資料可能會隨著時間成長，例如:log, <code>docker image/container</code>或是一些暫存檔等等。為了確定清楚硬碟塞爆是否會影響<code>Kubernetes</code>服務，因此接下來會測試塞爆三種disk並觀察會發生的情況。</p>
+<h2 id="使用到的指令"><a href="#使用到的指令" class="headerlink" title="使用到的指令"></a>使用到的指令</h2><p><strong>建立任意大小的檔案</strong><br><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ fallocate -l &lt;檔案大小&gt; &lt;檔案名稱&gt;</span><br><span class="line"></span><br><span class="line">Example:</span><br><span class="line">$ fallocate -l 50G test</span><br></pre></td></tr></table></figure></p>
+<p><strong>查看目錄屬於哪顆disk、大小及使用率</strong><br><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ df &lt;目錄&gt; -h</span><br><span class="line"></span><br><span class="line">Example:</span><br><span class="line">$ df /var/vcap/ -h</span><br></pre></td></tr></table></figure></p>
+<p><strong>查看目錄或檔案大小</strong><br><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ du -sh &lt;檔案名稱/目錄&gt;</span><br><span class="line"></span><br><span class="line">Example:</span><br><span class="line">$ du -sh /var/vcap/</span><br></pre></td></tr></table></figure></p>
+<p><strong>查看<code>docker</code>根目錄</strong><br><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ docker system info</span><br></pre></td></tr></table></figure></p>
+<p><strong>查看<code>docker image/container</code>數量/大小資訊</strong><br><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ docker system df</span><br></pre></td></tr></table></figure></p>
+<h2 id="Node-System-Disk-sda"><a href="#Node-System-Disk-sda" class="headerlink" title="Node System Disk(sda)"></a>Node System Disk(<code>sda</code>)</h2><p><strong>測試環境:</strong></p>
+<ul>
+<li>1台master, 2台worker</li>
+</ul>
+<p><strong>測試結果</strong></p>
+<ol>
+<li>Container不會掛掉，正常運行。</li>
+<li><code>BOSH</code> ssh到worker的時候會顯示<code>no space left on device</code>錯誤。</li>
+<li>修復方式<ul>
+<li>關閉壞掉的node讓<code>BOSH</code>自動修復，產生新的node VM。</li>
+<li>如果還能登入node，可以清掉一些資料釋出Node System Disk(<code>sda</code>)空間。</li>
+</ul>
+</li>
+</ol>
+<p><strong>測試流程</strong></p>
+<ol>
+<li><p>使用<code>kubectl</code>建立deployment到cluster上。</p>
+<p> <img src="https://i.imgur.com/4fwqOoO.png" alt></p>
+</li>
+<li><p>連到worker VM裡並塞滿<code>sda</code>空間</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line"># SSH</span><br><span class="line">bosh -d &lt;deployment&gt; ssh &lt;worker&gt;</span><br><span class="line"></span><br><span class="line"># 切換到/dev/sda1掛載目錄</span><br><span class="line">cd /var</span><br><span class="line"></span><br><span class="line"># 塞滿空間</span><br><span class="line">fallocate -l 10G test</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>Container依然正常運行無異常，但是當執行<code>bosh ssh</code>時出現下圖空間不足錯誤。</p>
+<p> <img src="https://i.imgur.com/W40XIom.png" alt></p>
+</li>
+</ol>
+<h2 id="Agent-Packages-Disk-sdb"><a href="#Agent-Packages-Disk-sdb" class="headerlink" title="Agent Packages Disk(sdb)"></a>Agent Packages Disk(<code>sdb</code>)</h2><p><strong>測試環境:</strong></p>
+<ul>
+<li>1台master, 2台worker</li>
+</ul>
+<p><strong>測試結果</strong></p>
+<ol>
+<li>Node會掛掉，無法負荷原本的container，因此原本上面跑的container都會變成<code>Evicted</code>狀態。(可能會造成服務中斷)</li>
+<li>如果有額外的node可用，master會佈新的container到別台node上。如果沒有，所有container都會變成<code>Pending</code>狀態。</li>
+<li>修復方式:<ul>
+<li>清出Agent Packages Disk空間，然後執行<code>monit restart all</code>，這樣node就會恢復正常。</li>
+</ul>
+</li>
+</ol>
+<p><strong>測試流程</strong></p>
+<ol>
+<li><p>使用<code>kubectl</code>建立deployment到cluster上。</p>
+<p> <img src="https://i.imgur.com/YLrnyK7.png" alt></p>
+</li>
+<li><p>連到worker VM(<code>b685858b...</code>)裡並塞滿<code>sdb</code>空間</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line"># SSH</span><br><span class="line">bosh -d &lt;deployment&gt; ssh &lt;worker&gt;</span><br><span class="line"></span><br><span class="line"># 切換到/dev/sdb2掛載目錄</span><br><span class="line">cd /var/vcap/data/</span><br><span class="line"></span><br><span class="line"># 塞滿空間</span><br><span class="line">fallocate -l 10G test</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>使用<code>kubectl</code>查看pods狀態，可以看到剛剛被塞爆的worker(<code>b685858b...</code>)上的pods都進入<code>Evicted</code>狀態，且master在其他node產生新的pods。</p>
+<p> <img src="https://i.imgur.com/l1PCEZ3.png" alt></p>
+</li>
+<li><p>使用<code>kubectl describe pods &lt;pod name&gt;</code>查看<code>Evicted</code> pod，可以看到是因為node空間不足導致的。</p>
+<p> <img src="https://i.imgur.com/gZX51JK.png" alt></p>
+</li>
+</ol>
+<h2 id="Persistent-Disk-sdc"><a href="#Persistent-Disk-sdc" class="headerlink" title="Persistent Disk(sdc)"></a>Persistent Disk(<code>sdc</code>)</h2><p><strong>測試環境:</strong></p>
+<ul>
+<li>1台master, 2台worker</li>
+</ul>
+<p><strong>測試結果</strong><br><div class="note info">
+            <p>與Agent Packages Disk(<code>sdb</code>)結果相同</p>
+          </div></p>
+<ol>
+<li>Node會掛掉，無法負荷原本的container，因此原本上面跑的container都會變成<code>Evicted</code>狀態。(可能會造成服務中斷)</li>
+<li>如果有額外的node可用，master會佈新的container到別台node上。如果沒有，所有container都會變成<code>Pending</code>狀態。</li>
+<li>修復方式:<ul>
+<li>清出persistent disk空間，然後在node上執行<code>monit restart all</code>指令，這樣node就會恢復正常。</li>
+</ul>
+</li>
+</ol>
+<p><strong>測試流程</strong></p>
+<ol>
+<li><p>使用<code>kubectl</code>建立deployment到cluster上。</p>
+<p> <img src="https://i.imgur.com/mlKfE1v.png" alt></p>
+</li>
+</ol>
+<ol start="2">
+<li><p>連到worker VM(<code>3f28d443...</code>)裡並塞滿<code>sdb</code>空間</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line"># SSH</span><br><span class="line">bosh -d &lt;deployment&gt; ssh &lt;worker&gt;</span><br><span class="line"></span><br><span class="line"># 切換到/dev/sdc1掛載目錄</span><br><span class="line">cd /var/vcap/store/docker</span><br><span class="line"></span><br><span class="line"># 塞滿空間</span><br><span class="line">fallocate -l 50G test</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>使用<code>kubectl</code>查看pods狀態，可以看到剛剛被塞爆的worker(<code>3f28d443...</code>)上的pods都進入<code>Evicted</code>狀態，且master在其他node產生新的pods。</p>
+<p> <img src="https://i.imgur.com/a3vEKZ7.png" alt></p>
+</li>
+</ol>
+<h2 id="擴大Node-Disk大小"><a href="#擴大Node-Disk大小" class="headerlink" title="擴大Node Disk大小"></a>擴大Node Disk大小</h2><p>看到上述測試可以得知disk如果滿了是有可能會影響服務，解決方法除了清掉不必要的檔案釋出空間之外，也可以選擇擴大原有的空間，但目前能擴大的只有<code>sdb</code>以及<code>sdc</code>。</p>
+<p>官方提供的擴大方式是到<code>PCF Ops Manager</code>去調原plan設定，例如把disk調大資源調多等等, 然後<code>apply change</code>的時候勾選<code>upgrade all cluster</code>, 這樣原有的cluster就會套用新的設定(cpu/memory/persistent disk…)，但只能修改原plan數值, 無法修改成不同plan(例如從plan1改成plan2)。詳情可參考<a href="https://community.pivotal.io/s/question/0D50e00005j9wr2/pks-plan-resizing" target="_blank" rel="noopener">連結</a> ，另外此方法的缺點是要改的話，全部同樣使用該plan的cluster都會一併修改。</p>
+<p>除了官方解法外，筆者我想到另外一種比較暴力的方法是直接在vCenter把node的硬碟擴大, 但是實際測試這種方式會導致<code>BOSH</code>那邊不同步引發錯誤，因此目前這是不可行的。</p>
+<p>以下是兩種方法的測試流程:</p>
+<h3 id="PCF-Ops-Manager調整Plan設定"><a href="#PCF-Ops-Manager調整Plan設定" class="headerlink" title="PCF Ops Manager調整Plan設定"></a>PCF Ops Manager調整Plan設定</h3><ol>
+<li><p>假設目前worker VM (<code>91997fd5...</code>) persistent disk已經被塞爆(預設50G)，希望能擴大空間。</p>
+<p> <img src="https://i.imgur.com/euMfkss.png" alt></p>
+</li>
+</ol>
+<ol start="2">
+<li><p>到<strong>PCF Ops Manager Web GUI &gt; Enterprise PKS Tile &gt; Plan</strong>將worker的persistent disk調整成75G。</p>
+<p> <img src="https://i.imgur.com/CQYZMUg.png" alt></p>
+</li>
+<li><p>Apply Change</p>
+<p> <img src="https://i.imgur.com/75Kg9LL.png" alt></p>
+</li>
+<li><p>完成後連到worker VM(<code>91997fd5...</code>)去看，可以看到空間已經成功擴大。</p>
+<p> <img src="https://i.imgur.com/rsK2ejX.png" alt></p>
+<p> <img src="https://i.imgur.com/LXvruwh.png" alt></p>
+</li>
+<li><p>Pod也可以正常的部署在worker VM (<code>91997fd5...</code>)上了。</p>
+<p> <img src="https://i.imgur.com/VSiEQfY.png" alt></p>
+</li>
+</ol>
+<h3 id="從vCenter強制調整Node-Disk大小"><a href="#從vCenter強制調整Node-Disk大小" class="headerlink" title="從vCenter強制調整Node Disk大小"></a>從vCenter強制調整Node Disk大小</h3><blockquote>
+<p>注意這種方式會導致<code>BOSH</code>那邊不同步引發錯誤，因此目前此方法是不可行的，但還是將過程列出來供參考。</p>
+</blockquote>
+<ol>
+<li><p>假設目前worker VM (<code>3f28d443...</code>) persistent disk已經被塞爆(預設50G)，希望能擴大空間。</p>
+<p> <img src="https://i.imgur.com/Tt4VPwq.png" alt></p>
+</li>
+<li><p>到vCenter上直接去將worker VM persistent disk調整為80G。</p>
+<p> <img src="https://i.imgur.com/Iqi8IWj.png" alt></p>
+<p> <img src="https://i.imgur.com/6HJdvMp.png" alt></p>
+</li>
+<li><p>接下來為了避免<code>BOSH</code>將這台worker砍掉，因此要先關閉自動修復機制。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ bosh -d &lt;deployment&gt; update-resurrection  off</span><br></pre></td></tr></table></figure>
+<p> <img src="https://i.imgur.com/yssRzzr.png" alt></p>
+</li>
+<li><p>接下來將worker VM(<code>3f28d443...</code>)關機。</p>
+<p> <img src="https://i.imgur.com/hydxUJn.png" alt></p>
+</li>
+<li><p>可以從<code>bosh vms</code>看到該台worker1 已經變成<code>unresponsive agent</code>狀態，但是<code>BOSH</code>不會將它砍掉。</p>
+<p> <img src="https://i.imgur.com/j19gZsa.png" alt></p>
+</li>
+<li><p>接下來到<strong>vCenter &gt; Datastore &gt; pcf_disks</strong>找到worker VM(<code>3f28d443...</code>)的persistent disk，並擴大它的空間。</p>
+<p> 先找出worker1對應的persistent disk(<code>Disk CIDs</code>)</p>
+ <figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ bosh instances -i</span><br></pre></td></tr></table></figure>
+<p> <img src="https://i.imgur.com/LCP91iw.png" alt></p>
+<p> 到<strong>vCenter &gt; Datastore &gt; pcf_disks</strong>找到對應的disk，可以發現disk還是50G。</p>
+<p> <img src="https://i.imgur.com/RAIviCX.png" alt></p>
+<p> 點擊<code>inflate</code>來擴大硬碟。(這個動作會跑一段時間)</p>
+<p> <img src="https://i.imgur.com/oUw5Yi2.png" alt></p>
+<p> 好了之後可以看到disk已經變80G。</p>
+<p> <img src="https://i.imgur.com/dxXNQZy.png" alt></p>
+</li>
+<li><p>接下來將worker1開機，但是開好之後還是<code>unresponsive agent</code>。</p>
+<p> <img src="https://i.imgur.com/rxH2FnH.png" alt></p>
+</li>
+<li><p>不得已情況下只好將自動修復開起來，看看<code>BOSH</code>會不會砍掉建立新的worker，然後將persistent disk掛載上去。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">$ bosh -d &lt;deployment&gt; update-resurrection  on</span><br></pre></td></tr></table></figure>
+<p> <img src="https://i.imgur.com/jQ66VyK.png" alt></p>
+</li>
+<li><p><code>BOSH</code>開始修復，但是修復到最後失敗，硬碟無法掛載，可能是因為disk裡的partition有變動到。到這裡就卡住了，BOSH就無法修復了，也許是某一步做錯或是<code>BOSH</code>本身不支援這種改法，後續如果有成功再來更新此篇，目前暫不將此方法列入解法。</p>
+<p> <img src="https://i.imgur.com/UcRfNFr.png" alt></p>
+</li>
+</ol>
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>測試下來的感覺好像跟是不是Enterprise PKS環境沒啥關係xD。不過經過此測試也比較清楚Enterprise PKS運行機制以及針對這種情況的處理方式，但對目前的Enterprise PKS來說，擴大硬碟的機制還是很不彈性，這有可能是受到<code>BOSH</code>的限制，希望未來能夠再加強這部分。</p>
+<h4 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h4><ol>
+<li>PKS Plan Resizing - <a href="https://community.pivotal.io/s/question/0D50e00005j9wr2/pks-plan-resizing" target="_blank" rel="noopener">https://community.pivotal.io/s/question/0D50e00005j9wr2/pks-plan-resizing</a></li>
+<li>Changing the thick or thin provisioning of a virtual disk - <a href="https://kb.vmware.com/s/article/2014832" target="_blank" rel="noopener">https://kb.vmware.com/s/article/2014832</a></li>
+</ol>
+<div class="note info">
+            <p>文章內容的轉載、重製、發佈，請註明出處: <a href="https://pohsienshih.github.io">https://pohsienshih.github.io</a></p>
+          </div>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/PKS/" rel="tag"># PKS</a>
+          
+            <a href="/tags/Kubernetes/" rel="tag"># Kubernetes</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/Enterprise-PKS-Introduction/" rel="next" title="Enterprise PKS介紹">
+                <i class="fa fa-chevron-left"></i> Enterprise PKS介紹
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/2019-iThome-Kubernetes-Summit-Notes/" rel="prev" title="iThome Kubernetes Summit 2019心得">
+                iThome Kubernetes Summit 2019心得 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+     <div class="comments" id="comments">
+      <div id="disqus_thread"></div>
+      <script>
+      
+      /**
+      *  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+      *  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+
+      var disqus_config = function () {
+      this.page.url = "https://pohsienshih.github.io/2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/"; // Replace PAGE_URL with your page's canonical URL variable
+      this.page.identifier = "2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+      };
+
+      (function() { // DON'T EDIT BELOW THIS LINE
+      var d = document, s = d.createElement('script');
+      s.src = 'https://pohsien-github-io.disqus.com/embed.js';
+      s.setAttribute('data-timestamp', +new Date());
+      (d.head || d.body).appendChild(s);
+      })();
+      </script>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+    </div>
+
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/pohsien.jpg" alt="Pohsien Shih">
+            
+              <p class="site-author-name" itemprop="name">Pohsien Shih</p>
+              <div class="site-description motion-element" itemprop="description">System Engineer</div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-categories">
+                  
+                    
+                      <a href="/categories/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">5</span>
+                    <span class="site-state-item-name">categories</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">10</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/pohsienshih" title="GitHub &rarr; https://github.com/pohsienshih" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:pohsien324@gmail.com" title="E-Mail &rarr; mailto:pohsien324@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+            <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+              <div class="links-of-blogroll-title">
+                <i class="fa  fa-fw fa-link"></i>
+                相關連結
+              </div>
+              <ul class="links-of-blogroll-list">
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://k2r2bai.com/" title="https://k2r2bai.com/" rel="noopener" target="_blank">凱仁大大</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://www.hwchiu.com/" title="https://www.hwchiu.com/" rel="noopener" target="_blank">邱牛大大</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://blog.pichuang.com.tw/" title="https://blog.pichuang.com.tw/" rel="noopener" target="_blank">小飛機</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://www.facebook.com/groups/cloudnative.tw/" title="https://www.facebook.com/groups/cloudnative.tw/" rel="noopener" target="_blank">CNTUG</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="Chttps://medium.com/@b02310043" title="Chttps://medium.com/@b02310043" rel="noopener" target="_blank">莫阿兆</a>
+                  </li>
+                
+              </ul>
+            </div>
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Kubernetes-Node上的disk種類"><span class="nav-number">1.</span> <span class="nav-text">Kubernetes Node上的disk種類</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#使用到的指令"><span class="nav-number">2.</span> <span class="nav-text">使用到的指令</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Node-System-Disk-sda"><span class="nav-number">3.</span> <span class="nav-text">Node System Disk(sda)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Agent-Packages-Disk-sdb"><span class="nav-number">4.</span> <span class="nav-text">Agent Packages Disk(sdb)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Persistent-Disk-sdc"><span class="nav-number">5.</span> <span class="nav-text">Persistent Disk(sdc)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#擴大Node-Disk大小"><span class="nav-number">6.</span> <span class="nav-text">擴大Node Disk大小</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#PCF-Ops-Manager調整Plan設定"><span class="nav-number">6.1.</span> <span class="nav-text">PCF Ops Manager調整Plan設定</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#從vCenter強制調整Node-Disk大小"><span class="nav-number">6.2.</span> <span class="nav-text">從vCenter強制調整Node Disk大小</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Summary"><span class="nav-number">7.</span> <span class="nav-text">Summary</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Reference"><span class="nav-number">7.0.1.</span> <span class="nav-text">Reference</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+        <div class="back-to-top">
+          <i class="fa fa-arrow-up"></i>
+          
+        </div>
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Pohsien Shih</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.8.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a></div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.1.1"></script>
+
+  <script src="/js/motion.js?v=7.1.1"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.1.1"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.1.1"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.1.1"></script>
+<script src="/js/post-details.js?v=7.1.1"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.1.1"></script>
+
+
+  
+
+  
+
+  
+
+  
+  
+  <script id="dsq-count-scr" src="https://.disqus.com/count.js" async></script>
+
+
+<script>
+  var disqus_config = function() {
+    this.page.url = "https://pohsienshih.github.io/2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/";
+    this.page.identifier = "2019/Enterprise-PKS-K8s-Node-Disk-Out-Of-Space/";
+    this.page.title = '針對Enterprise PKS環境的K8s Cluster Node硬碟空間不足測試及解法';
+    };
+  function loadComments() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', '' + +new Date());
+    (d.head || d.body).appendChild(s);
+  }
+  
+    loadComments();
+  
+</script>
+
+
+
+
+
+  
+
+
+  
+  <script>
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url).replace(/\/{2,}/g, '/');
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x"></i></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x"></i></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+<script>
+  $('.highlight').not('.gist .highlight').each(function(i, e) {
+    var $wrap = $('<div>').addClass('highlight-wrap');
+    $(e).after($wrap);
+    $wrap.append($('<button>').addClass('copy-btn').append('Copy').on('click', function(e) {
+      var code = $(this).parent().find('.code').find('.line').map(function(i, e) {
+        return $(e).text();
+      }).toArray().join('\n');
+      var ta = document.createElement('textarea');
+      var yPosition = window.pageYOffset || document.documentElement.scrollTop;
+      ta.style.top = yPosition + 'px'; // Prevent page scroll
+      ta.style.position = 'absolute';
+      ta.style.opacity = '0';
+      ta.readOnly = true;
+      ta.value = code;
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, code.length);
+      ta.readOnly = false;
+      var result = document.execCommand('copy');
+      
+      ta.blur(); // For iOS
+      $(this).blur();
+    })).on('mouseleave', function(e) {
+      var $b = $(this).find('.copy-btn');
+      setTimeout(function() {
+        $b.text('Copy');
+      }, 300);
+    }).append(e);
+  })
+</script>
+
+
+  
+
+  
+
+</body>
+</html>

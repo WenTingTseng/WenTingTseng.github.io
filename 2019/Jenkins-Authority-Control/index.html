@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+  <meta name="google-site-verification" content="googlea44f14c1ae61c18a.html">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2">
+
+<link rel="stylesheet" href="/css/main.css?v=7.1.1">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon-pohsien/apple-touch-icon-pohsien.png?v=7.1.1">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-pohsien/favicon-32x32-pohsien.png?v=7.1.1">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-pohsien/favicon-16x16-pohsien.png?v=7.1.1">
+
+
+  <link rel="mask-icon" href="/images/favicon-pohsien/favicon.ico?v=7.1.1" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.1.1',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: true,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="最近在公司導入 GitLab + Jenkins 來做 CI 以及自動化測試，為了提升安全性，因此在導入的過程中研究了一下關於 Jenkins 的相關權限設定，除了必須劃分使用者權限之外，Credential 部分也必須限制只有特定身份的專案(使用者)才能存取，且避免以明文的方式顯示在 Console 或是 Jenkinsfile ，這部分花了一些時間研究，因此使用此篇文章來紀錄目前研究到的相關">
+<meta name="keywords" content="Jenkins, authorization">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jenkins 相關權限管控">
+<meta property="og:url" content="https://pohsienshih.github.io/2019/Jenkins-Authority-Control/index.html">
+<meta property="og:site_name" content="Pohsien Workspace">
+<meta property="og:description" content="最近在公司導入 GitLab + Jenkins 來做 CI 以及自動化測試，為了提升安全性，因此在導入的過程中研究了一下關於 Jenkins 的相關權限設定，除了必須劃分使用者權限之外，Credential 部分也必須限制只有特定身份的專案(使用者)才能存取，且避免以明文的方式顯示在 Console 或是 Jenkinsfile ，這部分花了一些時間研究，因此使用此篇文章來紀錄目前研究到的相關">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-1.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-2.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-3.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-4.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-5.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-6.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-7.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-8.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-1.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-2.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-3.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-4.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-5.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-6.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-7.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-8.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/2-9.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-1.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-2.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-3.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-4.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-5.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-6.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-7.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-8.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-9.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-10.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/3-11.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/1-1.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/2-2.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/2-3.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/2-4.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/2-5.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/2-6.PNG">
+<meta property="og:image" content="https://pohsienshih.github.io/images/jenkins_permission/credentials/2-7.PNG">
+<meta property="og:updated_time" content="2019-12-20T03:10:51.481Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Jenkins 相關權限管控">
+<meta name="twitter:description" content="最近在公司導入 GitLab + Jenkins 來做 CI 以及自動化測試，為了提升安全性，因此在導入的過程中研究了一下關於 Jenkins 的相關權限設定，除了必須劃分使用者權限之外，Credential 部分也必須限制只有特定身份的專案(使用者)才能存取，且避免以明文的方式顯示在 Console 或是 Jenkinsfile ，這部分花了一些時間研究，因此使用此篇文章來紀錄目前研究到的相關">
+<meta name="twitter:image" content="https://pohsienshih.github.io/images/jenkins_permission/user/1-1.PNG">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="https://pohsienshih.github.io/2019/Jenkins-Authority-Control/">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>Jenkins 相關權限管控 | Pohsien Workspace</title>
+  
+
+
+
+
+  <script async src="//www.googletagmanager.com/gtag/js?id=UA-150934951-1"></script>
+  <script>
+    var host = window.location.hostname;
+    if (host !== "localhost" || !true) {
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'UA-150934951-1');
+    }
+  </script>
+
+
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Pohsien Workspace</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+      
+        <h1 class="site-subtitle" itemprop="description">Cloud Native, Network, Security, etc.</h1>
+      
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-about">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/about/" rel="section"><i class="menu-item-icon fa fa-fw fa-user"></i> <br>About</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-categories">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/categories/" rel="section"><i class="menu-item-icon fa fa-fw fa-th"></i> <br>Categories</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>Search</a>
+        </li>
+      
+    </ul>
+  
+
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="Searching..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://pohsienshih.github.io/2019/Jenkins-Authority-Control/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Pohsien Shih">
+      <meta itemprop="description" content="System Engineer">
+      <meta itemprop="image" content="/images/pohsien.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Pohsien Workspace">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h2 class="post-title" itemprop="name headline">Jenkins 相關權限管控
+
+              
+            
+          </h2>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2019-12-12 21:27:17" itemprop="dateCreated datePublished" datetime="2019-12-12T21:27:17+08:00">2019-12-12</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2019-12-20 11:10:51" itemprop="dateModified" datetime="2019-12-20T11:10:51+08:00">2019-12-20</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/Others/" itemprop="url" rel="index"><span itemprop="name">Others</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+            
+              
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+            
+                <span class="post-meta-item-text">Comments: </span>
+                <a href="/2019/Jenkins-Authority-Control/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/Jenkins-Authority-Control/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>最近在公司導入 GitLab + Jenkins 來做 CI 以及自動化測試，為了提升安全性，因此在導入的過程中研究了一下關於 Jenkins 的相關權限設定，除了必須劃分使用者權限之外，Credential 部分也必須限制只有特定身份的專案(使用者)才能存取，且避免以明文的方式顯示在 Console 或是 Jenkinsfile ，這部分花了一些時間研究，因此使用此篇文章來紀錄目前研究到的相關權限設置方法。<br><a id="more"></a></p>
+<h2 id="限制-User-只能存取特定的-Project-Pipeline"><a href="#限制-User-只能存取特定的-Project-Pipeline" class="headerlink" title="限制 User 只能存取特定的 Project/Pipeline"></a>限制 User 只能存取特定的 Project/Pipeline</h2><p>預設 Jenkins 使用者是沒有限制權限的，只要登入就能做任何操作，包括設置 project, credentials 以及 Jenkins Config 等等。但在實際應用上可能需要依照不同使用者給予不同權限，因此這邊會介紹如何去設置使用者權限。 Jenkins 有許多 Plugin 可以用來設定使用者權限，這邊會介紹比較常見的三種方式: <code>Project-based Matrix Authorization Strategy</code> 、<code>Role-based Authorization Strategy</code> 和 <code>Folder-based Authorization Strategy</code> 。</p>
+<h3 id="Project-based-Matrix-Authorization-Strategy"><a href="#Project-based-Matrix-Authorization-Strategy" class="headerlink" title="Project-based Matrix Authorization Strategy"></a>Project-based Matrix Authorization Strategy</h3><p><code>Project-based Matrix Authorization Strategy</code> 是 Jenkins 內建就安裝好的 Plugin ，只需要去啟用他就可以了。</p>
+<p>在此範例我們有三個使用者 (testuser, normaluser 和 admin) 以及三個 pipeline，並且各自使用者有各自的權限:</p>
+<table>
+<thead>
+<tr>
+<th>Pipelines</th>
+<th>Allow Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>testproject1</td>
+<td>testuser, admin</td>
+</tr>
+<tr>
+<td>testproject2</td>
+<td>testuser, admin</td>
+</tr>
+<tr>
+<td>normalproject</td>
+<td>normaluser, admin</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>在此範例 admin 是我們用來管理 Jenkins 的最高權限管理者</p>
+</blockquote>
+<ol>
+<li>到 <code>Jenkins GUI &gt; Manage Jenkins &gt; Configure Global Security</code> 將 <code>Enable security</code> 選項啟用，底下 Authorization 部分選擇 <code>Project-based Matrix Authorization Strategy</code> ，就可以啟用該功能。<br><img src="/images/jenkins_permission/user/1-1.PNG"></li>
+</ol>
+<ol start="2">
+<li><p>預設底下會有兩個 group: <code>Authenticated Users</code> 以及　<code>Anonymous Users</code> ，這兩個可以不用理會他，因為預設 Jenkins 是沒有 group 的，除非有使用到 LDAP 、 Active Directory 或是後面提到的 <code>Role-based Authorization Strategy</code> 才會有 group 的概念。要新增使用者或是群組權限只需要點擊底下的 <code>Add user or group</code> ，新增 username 或是 group name 後，再勾選需要的權限就可以了。在這裡我們新增 <code>testuser</code>,<code>normaluser</code> 以及 <code>admin</code> (這個是我們希望當管理者的帳號名稱，請自行修改成自己環境的帳號) 三個使用者的權限，除了 <code>admin</code> 全部勾選外，其他兩個使用者權限部分暫時先空白。<br><img src="/images/jenkins_permission/user/1-2.PNG"><br>請注意一定要新增一個管理者權限的使用者 (在此範例是 admin )，因為只要開啟了 <code>Project-based Matrix Authorization Strategy</code> 的功能，所有權限都會依照這裡設定的權限，所以原本 admin 的權限也會被抽掉，因此這裡一定也要加入 admin 的權限，不然設定好後管理者自己會被鎖在外面 (解法可參考 <a href="https://www.edureka.co/community/14079/what-is-the-default-jenkins-password" target="_blank" rel="noopener">What is the default Jenkins password?</a> 來關閉 user security 功能)。</p>
+<blockquote>
+<p>如果在新增 user 或是 group 發現如下圖的情況，表示 Jenkins 找不到該 user 或是 group ，請確認這個 user 及 group 是否真的存在。<br> <img src="/images/jenkins_permission/user/1-3.PNG"></p>
+</blockquote>
+</li>
+</ol>
+<ol start="3">
+<li>接下來設定 testuser 以及 normaluser 的權限，你會發現這邊只能設定 global 的權限，也就是只能針對整體去做控管，例如 Jobs 就是要馬就全部可存取，要馬就只能唯讀，並沒辦法限制使用者對於特定 Job, pipeline 或 project 等等的權限。如果想要做更細部的權限設定要到特定物件裡面去做設定，在此範例我們想要針對不同 pipeline 設定使用者權限，必須要到 pipeline 的 configure 去做權限設定，在這裡我們稱 local 權限。請注意， global 權限是會蓋過所有 local 權限的，因此在 global 設定這裡，我們必須先給 testuser 以及 normaluser Overall Read 的權限，讓它至少能登入 Jenkins 。<br><img src="/images/jenkins_permission/user/1-4.PNG"></li>
+</ol>
+<ol start="4">
+<li>接下來到 testproject1 的 configure 去查看，會發現多了一個 <code>Project-based Matrix Authorization Strategy</code> 的選項，這邊就是針對這個 pipeline 去做設定 local 權限。將這個選項打勾，並指定 testuser 能夠針對這個 project 做的所有設定。設定好後也到 testproject2 設定一樣的權限。<br><img src="/images/jenkins_permission/user/1-5.PNG"></li>
+</ol>
+<blockquote>
+<p>沒有啟用 local 的 <code>Project-based Matrix Authorization Strategy</code> 的話，使用者權限會直接吃 global 設定， 而 local 那邊預設操作會全部被禁止。</p>
+</blockquote>
+<ol start="5">
+<li>接下來到 normalproject 的 configure 一樣去加入 normaluser 的權限。<br><img src="/images/jenkins_permission/user/1-6.PNG"></li>
+</ol>
+<ol start="6">
+<li>好了之後登入看看，可以發現已成功限制使用者權限。<br><img src="/images/jenkins_permission/user/1-7.PNG"><br><img src="/images/jenkins_permission/user/1-8.PNG"></li>
+</ol>
+<h3 id="Role-based-Authorization-Strategy"><a href="#Role-based-Authorization-Strategy" class="headerlink" title="Role-based Authorization Strategy"></a>Role-based Authorization Strategy</h3><p>第二種設定使用者權限的方式是使用 <code>Role-based Authorization Strategy</code> ，這種方式是使用 Role (類似 group) 的概念來分配權限，因此能夠更加彈性，且不需要像 <code>Project-based Matrix Authorization Strategy</code> 需要一個個進到 pipeline configure 去做設定，只需要在一個地方做設定即可。</p>
+<p>這邊一樣使用之前的範例來做測試:</p>
+<table>
+<thead>
+<tr>
+<th>Pipelines</th>
+<th>Allow access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>testproject1</td>
+<td>testuser, admin</td>
+</tr>
+<tr>
+<td>testproject2</td>
+<td>testuser, admin</td>
+</tr>
+<tr>
+<td>normalproject</td>
+<td>normaluser, admin</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><p>首先確認已經安裝好 <a href="https://plugins.jenkins.io/role-strategy" target="_blank" rel="noopener">Role-based Authorization Strategy Plugin</a> ，接著一樣到 <code>Jenkins GUI &gt; Manage Jenkins &gt; Configure Global Security &gt; Enable security</code> ，在 <code>Authorization</code> 會發現多了一個 <code>Role-Based Strategy</code> 選項，將它勾選。<br><img src="/images/jenkins_permission/user/2-1.PNG" style="width:100%"></p>
+</li>
+<li><p>接著就可以在 <code>Manage Jenkins</code> 清單底下發現多了一個 <code>Manage and Assign Roles</code> 的項目，進到這個項目裡，然後點擊 <code>Manage Roles</code> 。<br><img src="/images/jenkins_permission/user/2-2.PNG"></p>
+</li>
+<li><p><code>Manage Roles</code> 是用來新增 Role 的地方，注意這邊<code>並不是指派權限給使用者的地方</code>。可以這裡看到有分三種類型的 Role: Global Roles 就是設定 user 或是 group 的 global 權限，與之前在 <code>Project-based Matrix Authorization Strategy</code> 中提到的一樣; Project Roles 是針對 Project 去做權限設定，也就是之後被指派到這個 Role 的 user 或 group 能夠對該 Project 操作上述設定的權限; 最後是 Slave Roles ，這個是針對 Slave 去做權限設定，也就是之後被指派到這個 Role 的 user 或 group 能夠對該 Slave 操作上述設定的權限。<br><img src="/images/jenkins_permission/user/2-3.PNG"></p>
+<p> 可以看到 Global Role 預設已經有一個叫做 <code>admin</code> 的管理者權限，這個是防止當你在 <code>Enable security</code> 那邊設定 <code>Role-Based Strategy</code> 之後，因權限制度改變導致管理者失去權限而被鎖在外面的情況。所以預設會建立一個 admin 管理權限，並直接將你當前的使用者套用這個 Role 。</p>
+<blockquote>
+<p>由於我們的管理者剛好也叫做 admin ，因此會有將 admin 使用者指派給 admin Role 的繞口情況 xD。</p>
+</blockquote>
+</li>
+<li><p>接下來新增會需要用的 Role ，在此範例我們會建立3種 Role:</p>
+</li>
+</ol>
+<ul>
+<li>Global Roles - normal =&gt; 設定 Overall Read 的權限，也就是至少能夠登入的權限。</li>
+<li>Project Roles - fortest =&gt; 針對 testproject1 和 testproject2 能夠操作的權限。</li>
+<li><p>Project Roles - fornormal =&gt; 針對 normalproject 能夠操作的權限。</p>
+<p>  首先建立 Global Roles。<br><img src="/images/jenkins_permission/user/2-4.PNG"></p>
+<p>  接著建立 Project Roles ， Pattern 是吃 Regular Expression 的語法，也就是會透過這個 Pattern 抓到對應的 Project ，例如我們可以使用 <code>testproject.*</code> 來抓到 <code>testproject1</code>　以及 <code>testproject2</code> 。<br><img src="/images/jenkins_permission/user/2-5.PNG"></p>
+<p>  完成之後可以點擊 Pattern 看看有比對到那些 Project。<br><img src="/images/jenkins_permission/user/2-6.PNG"></p>
+<p>  都新增好了後，點擊底下的 Save 儲存，這樣就完成 Role 的建立。</p>
+</li>
+</ul>
+<ol start="4">
+<li><p>接下來到 <code>Manage Jenkins &gt; Manage and Assign Roles &gt; Assign Roles</code> ，這邊我們會指派 Role 給特定 user 或 group ，只需要加入 user 或是 group ，然後勾選要給它的 Role 就可以了。可以看到預設 admin 使用者已經被賦予 admin 權限，這就是前一點提到的防止管理者被踢出去。</p>
+<p> 在這一步中，我們會將 testuser 以及 normaluser 先指派 <code>normal</code> 的 Global Role ，讓他們至少可以登入 Jenkins ，再個別指派對應的 Project Role 給使用者，設定完如下圖:<br><img src="/images/jenkins_permission/user/2-7.PNG"></p>
+</li>
+</ol>
+<ol start="5">
+<li>完成之後登入看看，可以發現已成功限制使用者權限。<br><img src="/images/jenkins_permission/user/2-8.PNG"><br><img src="/images/jenkins_permission/user/2-9.PNG"></li>
+</ol>
+<h3 id="Folder-based-Authorization-Strategy"><a href="#Folder-based-Authorization-Strategy" class="headerlink" title="Folder-based Authorization Strategy"></a>Folder-based Authorization Strategy</h3><p><code>Role-based Authorization Strategy</code> 雖然很方便，但是在賦予權限的時候還是需要一個個 project 去設定，當 project 或是 pipeline 數量很大的時候管理上就會比較麻煩，因此還有一種方式是使用 <code>Folder-based Authorization Strategy</code> ，從字面上就可以看出來，它是使用 folder 為單位來設定權限，它的設定跟 <code>Role-based Authorization Strategy</code> 幾乎一模一樣，只是設定對象從 project 變成 folder ，接下來透過範例來測試看看。</p>
+<p>這邊範例情境與之前一樣，只是新增了兩個 folder ( testfolder 和 normalfolder )，並把:</p>
+<table>
+<thead>
+<tr>
+<th>Pipelines</th>
+<th>Folder</th>
+<th>Allow access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>testproject1</td>
+<td>testfolder</td>
+<td>testuser, admin</td>
+</tr>
+<tr>
+<td>testproject2</td>
+<td>testfolder</td>
+<td>testuser, admin</td>
+</tr>
+<tr>
+<td>normalproject</td>
+<td>normalfolder</td>
+<td>normaluser, admin</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><p>首先確認已經安裝好 <a href="https://plugins.jenkins.io/folder-auth" target="_blank" rel="noopener">Folder-based Authorization Strategy Plugin</a> ，接著一樣到 <code>Jenkins GUI &gt; Manage Jenkins &gt; Configure Global Security &gt; Enable security</code> ，在 <code>Authorization</code> 會發現多了一個 <code>Folder Authorization Strategy</code> 選項，將它勾選。<br><img src="/images/jenkins_permission/user/3-1.PNG"></p>
+</li>
+<li><p>在 <code>Manage Jenkins</code> 清單底下也會多了一個 <code>Folder Authorization Strategy</code> 的項目，接著進到這個項目裡。<br><img src="/images/jenkins_permission/user/3-2.PNG"></p>
+</li>
+<li><p>進來之後會發現一樣有三種 Role: Global Roles 就是前面提到的 Global 權限; Folder Roles 是針對 Folder 去做權限設定，也就是之後被指派到這個 Role 的 user 或 group 能夠對該 Folder 操作上述設定的權限; 最後一個是 Agent Roles ，這個是針對 Agent(也就是 Slave) 去做權限設定，也就是之後被指派到這個 Role 的 user 或 group 能夠對該 Agent 操作上述設定的權限。<br><img src="/images/jenkins_permission/user/3-3.PNG"></p>
+</li>
+</ol>
+<p>這邊可以看到預設已經將當前的使用者加入到管理者權限的 Global Roles ，防止當啟用 <code>Folder-Based Strategy</code> 之後，因權限制度改變導致管理者失去權限而被鎖在外面的情況。</p>
+<ol start="4">
+<li>接下來新增會需要用的 Role ，在此範例我們會建立3種 Role:</li>
+</ol>
+<ul>
+<li>Global Roles - normal =&gt; 設定 Overall Read 的權限，也就是至少能夠登入的權限。</li>
+<li>Folder Roles - fortest =&gt; 針對 testfolder 能夠操作的權限。</li>
+<li><p>Folder Roles - fornormal =&gt; 針對 normalfolder 能夠操作的權限。</p>
+<p>  新增 Global Roles - normal<br><img src="/images/jenkins_permission/user/3-4.PNG"></p>
+<p>  新增 Folder Roles，<code>Apply on</code> 是設定這個 Role 對應到哪個 Folder ，因此這裡可以看到兩個我們建立的 Folder: <code>testfolder</code> 和 <code>normalfolder</code> 。<br><img src="/images/jenkins_permission/user/3-5.PNG"></p>
+</li>
+</ul>
+<ol start="5">
+<li><p>建立好 Role 之後，接下來就是將這些 Role 指派給 user 或 group ，直接在同個頁面就可以設定指派。只需要在特定 Role 上面的 <code>SID</code> 輸入 user或是 group 名稱即可。</p>
+<p> 指派 Global Roles - normal 給 testuser 以及 normaluser。完成後如下圖。<br><img src="/images/jenkins_permission/user/3-6.PNG" style="width:85%"></p>
+<p> 指派Folder Roles 給使用者，完成後如下圖：</p>
+<ul>
+<li>Folder Roles - fortest 給 testuser</li>
+<li>Folder Roles - fornormal 給 normaluser<br><img src="/images/jenkins_permission/user/3-7.PNG" style="width:80%"></li>
+</ul>
+</li>
+</ol>
+<ol start="6">
+<li>完成之後登入看看，可以發現已成功限制使用者權限。<br><strong>normaluser</strong><br><img src="/images/jenkins_permission/user/3-8.PNG"><br><img src="/images/jenkins_permission/user/3-9.PNG"><br><strong>testuser</strong><br><img src="/images/jenkins_permission/user/3-10.PNG"><br><img src="/images/jenkins_permission/user/3-11.PNG"></li>
+</ol>
+<h2 id="在-Pipeline-使用-Credentials"><a href="#在-Pipeline-使用-Credentials" class="headerlink" title="在 Pipeline 使用 Credentials"></a>在 Pipeline 使用 Credentials</h2><p>在使用 Pipeline 的時候，有時候執行的 Step 可能會需要使用到一些 password, token, secret 之類的敏感資訊，直接將這些敏感資訊寫在 Jenkinsfile 是相當不安全的，就算只是測試用系統也是不建議這樣做。在 Jenkins 裡可以使用 <code>Credentials Binding Plugin</code> (預設已經安裝) 來支援 credentials 的機制，也就是可以在 Jenkins  GUI 事先輸入好需要的敏感資訊，然後再直接設定套用這些 credentials 就可以了。</p>
+<p>可以看到 Jenkins 支援很多種格式的 credentials：<br><img src="/images/jenkins_permission/credentials/1-1.PNG" width="100%"></p>
+<p>這些 credentials 不只可以在 Jenkins GUI 去進行存取(例如給 object 權限)，也可以在 Pipeline 裡面去呼叫這些 credentials ，只需要使用 <code>withCredentials</code>  block 就可以了，實際使用方法如下:</p>
+<figure class="highlight groovy"><table><tr><td class="code"><pre><span class="line"><span class="comment">// Username and Password</span></span><br><span class="line">withCredentials([usernamePassword(<span class="string">credentialsId:</span> <span class="string">'gitlab-jenkins'</span>, <span class="string">usernameVariable:</span> <span class="string">'USERNAME'</span>, <span class="string">passwordVariable:</span> <span class="string">'PASSWORD'</span>)]) &#123;                </span><br><span class="line">    sh <span class="string">'echo account=$USERNAME, password=$PASSWORD'</span></span><br><span class="line">    ...</span><br><span class="line">&#125;						</span><br><span class="line"></span><br><span class="line"><span class="comment">// Token</span></span><br><span class="line">withCredentials([string(<span class="string">credentialsId:</span> <span class="string">'mytoken'</span>, <span class="string">variable:</span> <span class="string">'TOKEN'</span>)]) &#123;</span><br><span class="line">    sh <span class="string">'''</span></span><br><span class="line"><span class="string">      set +x</span></span><br><span class="line"><span class="string">      curl -H "Token: $TOKEN" https://some.api/</span></span><br><span class="line"><span class="string">    '''</span></span><br><span class="line">&#125;</span><br><span class="line">  </span><br><span class="line"><span class="comment">// Secret Text</span></span><br><span class="line">withCredentials([string(<span class="string">credentialsId:</span> <span class="string">'secret'</span>, <span class="string">variable:</span> <span class="string">'MYSECRET'</span>)]) &#123;</span><br><span class="line">    sh <span class="string">'''</span></span><br><span class="line"><span class="string">      set +x</span></span><br><span class="line"><span class="string">      curl -H "Token: $MYSECRET" https://some.api/</span></span><br><span class="line"><span class="string">    '''</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Certificate or Secret File </span></span><br><span class="line">withCredentials([file(<span class="string">credentialsId:</span> <span class="string">'secret'</span>, <span class="string">variable:</span> <span class="string">'My_CERT_FILE'</span>)]) &#123;</span><br><span class="line">      sh <span class="string">'use $My_CERT_FILE'</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上列出幾種存取 credentials 的方式，他的格式為 <code>withCredentials(&lt;要存取的credentials 格式&gt;[需要的參數1,需要的參數2, ... ])</code> ，存取方式非常彈性，可以存取帳密的型態的 credentials、單純一串字串(<code>string()</code>)的或是能夠直接取得檔案 (<code>file()</code>)，例如一些憑證檔案或是認證檔之類的。 <code>credentialsId</code> 就是你在建立 credentials 時設定的名稱，而 <code>variable</code> 是自行定義一個變數名稱來代表這個　credential，讓你的 pipeline 可以透過這個變數來存取 credential，這個變數只會使用在 <code>當前</code> 的 pipeline，因此是不會影響到其他的 pipeline 的，如果想要如何存取其他格式的 credentials 可以參考 <a href="https://jenkins.io/doc/pipeline/steps/credentials-binding/" target="_blank" rel="noopener">Credentials Binding Plugin</a>。</p>
+<blockquote>
+<p>在存取 credentials 之前請記得一定要先在 Jenkins GUI 建立好你的 credentials ，不然跑 pipeline 的時候，會跳出找不到 credentials 的錯誤。</p>
+</blockquote>
+<p><code>withCredentials</code> block 必須放在 <code>steps</code> 裡面，因此完整的使用範例如下:<br><figure class="highlight groovy"><table><tr><td class="code"><pre><span class="line">pipeline &#123;</span><br><span class="line">    agent &#123; ... &#125;</span><br><span class="line">   </span><br><span class="line">    stages &#123;</span><br><span class="line">        stage(<span class="string">"MyStage"</span>) &#123;</span><br><span class="line">            steps &#123;</span><br><span class="line">                withCredentials([usernamePassword(<span class="string">credentialsId:</span> <span class="string">'gitlab-jenkins'</span>, <span class="string">usernameVariable:</span> <span class="string">'USERNAME'</span>, <span class="string">passwordVariable:</span> <span class="string">'PASSWORD'</span>)]) &#123;  </span><br><span class="line">                    sh <span class="string">'echo account=$USERNAME, password=$PASSWORD'</span></span><br><span class="line">                    ...</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>這種存取 credentials 的方式非常彈性，且支援許多方式的認證機制，例如 Kubernetes, Docker 或 Vault 等等，非常方便，但是到這裡你可能會想一個問題: 是不是任一 pipeline 只要使用 <code>withCredentials</code> 及知道 credentials id 就可以隨意存取到所有的 credentials 了呢? 例如 A project 去存取 B 專案的 credentials ，B 專案去存取 C 專案的 credentials 等等。 實際上的確是會有這個問題，為了避免這種情況，因此接下來會介紹如何限制 project <code>只能</code> 存取特定的 credentials 。</p>
+<h2 id="限制-Project-只能存取特定的-Credentials"><a href="#限制-Project-只能存取特定的-Credentials" class="headerlink" title="限制 Project 只能存取特定的 Credentials"></a>限制 Project 只能存取特定的 Credentials</h2><p>預設 Jenkins 是沒有針對 credentials 去做權限控管的，這樣子等於任何人都能存取 credentials ，這相當的不安全，因此在這理會介紹如何限制 pipeline 只能存取特定的 credentials 。</p>
+<p>這裡會需要使用到 Jenkins folder ，只需要將 pipeline 或是 project 加到特定 folder 裡，接著建立 folder-level 的 credentials 這樣就可以了。</p>
+<p>在此範例中，我們有兩個資料夾，分別是: fortest 和 fornormal ，兩個資料夾裡包含各自的 project (testproject1, testproject2, normalproject)，我們希望限制只有 fortest 資料夾裡的專案可以存取 <code>testing-secret</code> 這個 credential。</p>
+<table>
+<thead>
+<tr>
+<th>Pipelines</th>
+<th>Folder</th>
+<th>Credentials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>testproject1</td>
+<td>fortest</td>
+<td>Can access <code>testing-secret</code></td>
+</tr>
+<tr>
+<td>testproject2</td>
+<td>fortest</td>
+<td>Can access <code>testing-secret</code></td>
+</tr>
+<tr>
+<td>normalproject</td>
+<td>fornormal</td>
+<td>Can not access <code>testing-secret</code></td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><p>首先進到 fortest 資料夾，可以看到已經有兩個 pipeline。<br><img src="/images/jenkins_permission/credentials/2-2.PNG"></p>
+</li>
+<li><p>接著直接在左邊點擊 <code>Credentials &gt; Folder</code>，建立 folder-level credentials。<br><img src="/images/jenkins_permission/credentials/2-3.PNG"><br><img src="/images/jenkins_permission/credentials/2-4.PNG"></p>
+</li>
+<li><p>接著新增 <code>testing-secret</code> credential，這樣就建立好 folder-level 的 credentials。<br><img src="/images/jenkins_permission/credentials/2-5.PNG"></p>
+</li>
+<li><p>接下來就來實際測試一下, 以下為測試的 pipeline script ，我們分別跑在 testproject1 以及 normalproject 看看結果如何。</p>
+<figure class="highlight groovy"><table><tr><td class="code"><pre><span class="line">pipeline &#123;</span><br><span class="line">    agent &#123; ... &#125;</span><br><span class="line">   </span><br><span class="line">    stages &#123;</span><br><span class="line">        stage(<span class="string">"MyStage"</span>) &#123;</span><br><span class="line">            steps &#123;</span><br><span class="line">                withCredentials([usernamePassword(<span class="string">credentialsId:</span> <span class="string">'testing-secret'</span>, <span class="string">usernameVariable:</span> <span class="string">'USERNAME'</span>, <span class="string">passwordVariable:</span> <span class="string">'PASSWORD'</span>)]) &#123;  </span><br><span class="line">                    sh <span class="string">'echo account=$USERNAME, password=$PASSWORD'</span></span><br><span class="line">                    ...</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p> testproject1: 可以看到正常的抓到 credentails。<br><img src="/images/jenkins_permission/credentials/2-6.PNG"></p>
+<p> normalproject: 執行失敗，找不到 credentials，由此可以判定已成功限制 credentials 存取權限。<br><img src="/images/jenkins_permission/credentials/2-7.PNG"></p>
+</li>
+</ol>
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>在此篇文章我們介紹了許多種方式來限制使用者和 credentials 的權限，在使用者權限管理方面，筆者在公司採用的是 <code>Folder-based Authorization Strategy</code>，除了方便後續專案越來越多比較好管理之外，也可以使用 Folder-based 機制來限制 credentials 權限，比較方便。</p>
+<p>最後，由於 Jenkins 有許多的 Plugin 可以使用，因此也許還有更多種方式可以去對權限做管理，這部分如果後續有研究到，再補充上來。</p>
+<h2 id="參考資料"><a href="#參考資料" class="headerlink" title="參考資料"></a>參考資料</h2><p><strong>限制 User 只能存取特定的 Project</strong></p>
+<ul>
+<li><a href="https://stackoverflow.com/questions/29568905/how-to-limit-user-permissions-on-jenkins/29569101" target="_blank" rel="noopener">How to limit user permissions on jenkins?</a></li>
+<li><p><a href="https://www.tothenew.com/blog/jenkins-implementing-project-based-matrix-authorization-strategy/" target="_blank" rel="noopener">Jenkins – Implementing Project-based Matrix Authorization Strategy</a></p>
+</li>
+<li><p><a href="https://plugins.jenkins.io/role-strategy" target="_blank" rel="noopener">Role-based Authorization Strategy Plugin</a></p>
+</li>
+<li><a href="https://support.cloudbees.com/hc/en-us/articles/204173600-How-do-I-limit-users-access-to-the-folders-to-which-they-belong-to-" target="_blank" rel="noopener">How do I limit users access to the folders to which they belong to?</a></li>
+<li><a href="https://plugins.jenkins.io/folder-auth" target="_blank" rel="noopener">Folder-based Authorization Strategy Plugin</a></li>
+</ul>
+<p><strong>在 pipeline 使用 credentials</strong></p>
+<ul>
+<li><a href="https://jenkins.io/doc/pipeline/steps/credentials-binding/" target="_blank" rel="noopener">Credentials Binding Plugin</a></li>
+<li><a href="https://emilwypych.com/2019/06/15/how-to-pass-credentials-to-jenkins-pipeline/" target="_blank" rel="noopener">How to pass credentials to Jenkins pipeline</a></li>
+<li><a href="https://support.cloudbees.com/hc/en-us/articles/203802500-Injecting-Secrets-into-Jenkins-Build-Jobs" target="_blank" rel="noopener">Injecting Secrets into Jenkins Build Jobs</a></li>
+</ul>
+<p><strong>限制 Project 只能存取特定的 Credentials</strong></p>
+<ul>
+<li><a href="https://stackoverflow.com/questions/29112679/how-to-restrict-credentials-in-jenkins" target="_blank" rel="noopener">How to restrict credentials in Jenkins?</a></li>
+</ul>
+<div class="note info">
+            <p>文章內容的轉載、重製、發佈，請註明出處: <a href="https://pohsienshih.github.io">https://pohsienshih.github.io</a></p>
+          </div>
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Jenkins/" rel="tag"># Jenkins</a>
+          
+            <a href="/tags/CICD/" rel="tag"># CICD</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/E2E-Testing-for-Kubernetes-Part-II/" rel="next" title="End-to-End Testing for Kubernetes (Part II) - Conformance Testing">
+                <i class="fa fa-chevron-left"></i> End-to-End Testing for Kubernetes (Part II) - Conformance Testing
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+     <div class="comments" id="comments">
+      <div id="disqus_thread"></div>
+      <script>
+      
+      /**
+      *  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+      *  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+
+      var disqus_config = function () {
+      this.page.url = "https://pohsienshih.github.io/2019/Jenkins-Authority-Control/"; // Replace PAGE_URL with your page's canonical URL variable
+      this.page.identifier = "2019/Jenkins-Authority-Control/"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+      };
+
+      (function() { // DON'T EDIT BELOW THIS LINE
+      var d = document, s = d.createElement('script');
+      s.src = 'https://pohsien-github-io.disqus.com/embed.js';
+      s.setAttribute('data-timestamp', +new Date());
+      (d.head || d.body).appendChild(s);
+      })();
+      </script>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+    </div>
+
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/pohsien.jpg" alt="Pohsien Shih">
+            
+              <p class="site-author-name" itemprop="name">Pohsien Shih</p>
+              <div class="site-description motion-element" itemprop="description">System Engineer</div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-categories">
+                  
+                    
+                      <a href="/categories/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">5</span>
+                    <span class="site-state-item-name">categories</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">10</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/pohsienshih" title="GitHub &rarr; https://github.com/pohsienshih" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:pohsien324@gmail.com" title="E-Mail &rarr; mailto:pohsien324@gmail.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+            <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+              <div class="links-of-blogroll-title">
+                <i class="fa  fa-fw fa-link"></i>
+                相關連結
+              </div>
+              <ul class="links-of-blogroll-list">
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://k2r2bai.com/" title="https://k2r2bai.com/" rel="noopener" target="_blank">凱仁大大</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://www.hwchiu.com/" title="https://www.hwchiu.com/" rel="noopener" target="_blank">邱牛大大</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://blog.pichuang.com.tw/" title="https://blog.pichuang.com.tw/" rel="noopener" target="_blank">小飛機</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="https://www.facebook.com/groups/cloudnative.tw/" title="https://www.facebook.com/groups/cloudnative.tw/" rel="noopener" target="_blank">CNTUG</a>
+                  </li>
+                
+                  <li class="links-of-blogroll-item">
+                    <a href="Chttps://medium.com/@b02310043" title="Chttps://medium.com/@b02310043" rel="noopener" target="_blank">莫阿兆</a>
+                  </li>
+                
+              </ul>
+            </div>
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#限制-User-只能存取特定的-Project-Pipeline"><span class="nav-number">1.</span> <span class="nav-text">限制 User 只能存取特定的 Project/Pipeline</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Project-based-Matrix-Authorization-Strategy"><span class="nav-number">1.1.</span> <span class="nav-text">Project-based Matrix Authorization Strategy</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Role-based-Authorization-Strategy"><span class="nav-number">1.2.</span> <span class="nav-text">Role-based Authorization Strategy</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Folder-based-Authorization-Strategy"><span class="nav-number">1.3.</span> <span class="nav-text">Folder-based Authorization Strategy</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#在-Pipeline-使用-Credentials"><span class="nav-number">2.</span> <span class="nav-text">在 Pipeline 使用 Credentials</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#限制-Project-只能存取特定的-Credentials"><span class="nav-number">3.</span> <span class="nav-text">限制 Project 只能存取特定的 Credentials</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Summary"><span class="nav-number">4.</span> <span class="nav-text">Summary</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#參考資料"><span class="nav-number">5.</span> <span class="nav-text">參考資料</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+        <div class="back-to-top">
+          <i class="fa fa-arrow-up"></i>
+          
+        </div>
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Pohsien Shih</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.8.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a></div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.1.1"></script>
+
+  <script src="/js/motion.js?v=7.1.1"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.1.1"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.1.1"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.1.1"></script>
+<script src="/js/post-details.js?v=7.1.1"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.1.1"></script>
+
+
+  
+
+  
+
+  
+
+  
+  
+  <script id="dsq-count-scr" src="https://.disqus.com/count.js" async></script>
+
+
+<script>
+  var disqus_config = function() {
+    this.page.url = "https://pohsienshih.github.io/2019/Jenkins-Authority-Control/";
+    this.page.identifier = "2019/Jenkins-Authority-Control/";
+    this.page.title = 'Jenkins 相關權限管控';
+    };
+  function loadComments() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', '' + +new Date());
+    (d.head || d.body).appendChild(s);
+  }
+  
+    loadComments();
+  
+</script>
+
+
+
+
+
+  
+
+
+  
+  <script>
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url).replace(/\/{2,}/g, '/');
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x"></i></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x"></i></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+<script>
+  $('.highlight').not('.gist .highlight').each(function(i, e) {
+    var $wrap = $('<div>').addClass('highlight-wrap');
+    $(e).after($wrap);
+    $wrap.append($('<button>').addClass('copy-btn').append('Copy').on('click', function(e) {
+      var code = $(this).parent().find('.code').find('.line').map(function(i, e) {
+        return $(e).text();
+      }).toArray().join('\n');
+      var ta = document.createElement('textarea');
+      var yPosition = window.pageYOffset || document.documentElement.scrollTop;
+      ta.style.top = yPosition + 'px'; // Prevent page scroll
+      ta.style.position = 'absolute';
+      ta.style.opacity = '0';
+      ta.readOnly = true;
+      ta.value = code;
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, code.length);
+      ta.readOnly = false;
+      var result = document.execCommand('copy');
+      
+      ta.blur(); // For iOS
+      $(this).blur();
+    })).on('mouseleave', function(e) {
+      var $b = $(this).find('.copy-btn');
+      setTimeout(function() {
+        $b.text('Copy');
+      }, 300);
+    }).append(e);
+  })
+</script>
+
+
+  
+
+  
+
+</body>
+</html>
